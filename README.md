@@ -15,3 +15,5 @@ Used an existing model for a [mandala](https://www.thingiverse.com/thing:4248155
 * [WS2811 LEDs, 60/m](https://www.amazon.com/dp/B01CNL6LBK?psc=1&ref=ppx_yo2ov_dt_b_product_details)
 
 ## Pics
+
+![3d model](./docs/model.png)
