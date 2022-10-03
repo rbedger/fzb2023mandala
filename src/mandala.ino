@@ -49,8 +49,6 @@ unsigned long lastLoopMillis = 0;
 OnOff prevBtnState = OnOff::OFF;
 Mode curMode = Mode::Actualization;
 
-CRGB solidColor = CRGB::Red;
-
 void setup()
 {
   Serial.begin(115200);
