@@ -6,34 +6,31 @@
 #include <SoftwareSerial.h>
 #endif
 
-// A small helper
-void error(const __FlashStringHelper *err)
-{
-  Serial.println(err);
-  while (1)
-    ;
-}
-
-float parsefloat(uint8_t *buffer);
-void printHex(const uint8_t *data, const uint32_t numBytes);
-
-// the packet buffer
-extern uint8_t packetbuffer[];
-
 #include "FastLED.h"
 
-#define MODE_PIN D5
 #define DATA_PIN D0
-#define NUM_LEDS 31 + (4 * 4)
+
+#define MODE_PIN D5
 #define ANALOG_THRESHOLD 1000
-#define MAX_BRIGHTNESS 255
+
+#define NUM_LEDS_RING 31
+#define NUM_MANDALA_LEGS 4
+#define NUM_LEDS_MANDALA_LEG 4
+#define NUM_LEDS_MANDALA (NUM_MANDALA_LEGS * NUM_LEDS_MANDALA_LEG)
+#define NUM_LEDS (NUM_LEDS_RING + NUM_LEDS_MANDALA)
+
+// 60ma/led, 2A max slip ring
+#define PROJECT_MAX_BRIGHTNESS 180
+
 #define MIN_BRIGHTNESS_LOOPS 3
 
 CRGB leds[NUM_LEDS];
 
 enum Mode
 {
-  Actualization = 0,
+  Boot = 0,
+  Chase = 1,
+  SlowFade = 2,
 };
 
 enum OnOff
@@ -47,7 +44,7 @@ unsigned long lastModePressMillis = 0;
 unsigned long lastLoopMillis = 0;
 
 OnOff prevBtnState = OnOff::OFF;
-Mode curMode = Mode::Actualization;
+Mode curMode = Mode::Chase;
 
 void setup()
 {
@@ -59,7 +56,7 @@ void setup()
 
 void loop()
 {
-  readMode();
+  // readMode();
   displayMode();
 
   FastLED.show();
@@ -100,7 +97,7 @@ void readMode()
       // debounce brightness change a bit
       if (elapsedMillis > 175)
       {
-        FastLED.setBrightness((FastLED.getBrightness() + 25) % MAX_BRIGHTNESS);
+        FastLED.setBrightness((FastLED.getBrightness() + 25) % PROJECT_MAX_BRIGHTNESS);
 
         Serial.print("Changed brightness to: ");
         Serial.println(FastLED.getBrightness());
@@ -113,14 +110,72 @@ void readMode()
   prevBtnState = curBtnState;
 }
 
+int currentRedIndex = 0;
+int currentBlueIndex = NUM_LEDS_RING / 3;
+int currentGreenIndex = NUM_LEDS_RING / 3 * 2;
+
 void displayMode()
 {
   switch (curMode)
   {
-  case Mode::Actualization:
+  case Mode::Boot:
     fill_solid(leds, NUM_LEDS, CRGB::White);
     break;
+  case Mode::Chase:
+    FastLED.clearData();
+    displayChase(
+        CRGB::Red,
+        &currentRedIndex);
+
+    displayChase(
+        CRGB::Blue,
+        &currentBlueIndex);
+
+    displayChase(
+        CRGB::Green,
+        &currentGreenIndex);
+
+    break;
+  case Mode::SlowFade:
+    displaySlowFade();
+    break;
   }
+}
+
+void displayChase(
+    CRGB chaseColor,
+    int *currentChaseIndex)
+{
+  unsigned char nextChaseIndex = (*currentChaseIndex + 1) % NUM_LEDS;
+
+  if (nextChaseIndex < NUM_LEDS_RING)
+  {
+    leds[nextChaseIndex] = chaseColor;
+  }
+  else if (nextChaseIndex < NUM_LEDS_MANDALA_LEG + NUM_LEDS_RING)
+  {
+    for (int i = 0; i < 4; i++)
+    {
+      int legIndex = nextChaseIndex + (NUM_LEDS_MANDALA_LEG * i);
+      if (i % 2 == 1)
+      {
+        leds[legIndex] = chaseColor;
+      }
+      else
+      {
+        int endOfLeg = NUM_LEDS_RING + NUM_LEDS_MANDALA_LEG - 1 + (NUM_LEDS_MANDALA_LEG * i);
+        int offset = endOfLeg - legIndex;
+        leds[endOfLeg - (NUM_LEDS_MANDALA_LEG - 1 - offset)] = chaseColor;
+      }
+    }
+  }
+  else
+  {
+    nextChaseIndex = 0;
+  }
+
+  *currentChaseIndex = nextChaseIndex;
+  delay(100);
 }
 
 CRGB slowFadeColors[NUM_LEDS] = {
@@ -164,31 +219,4 @@ void displaySlowFade()
   }
 
   delay(1);
-}
-
-unsigned long lastAccelerometerUpdate = 0;
-uint8_t maxX = 0, maxY = 0, maxZ = 0;
-
-const int xLeds[4] = {0, 1, 2, 3};
-const int yLeds[4] = {4, 5, 6, 8};
-const int zLeds[3] = {7, 9, 10};
-
-unsigned long getAccelerometerColor(uint8_t value)
-{
-  if (value < 5)
-  {
-    return CRGB::Red;
-  }
-
-  if (value < 10)
-  {
-    return CRGB::Yellow;
-  }
-
-  if (value < 15)
-  {
-    return CRGB::Orange;
-  }
-
-  return CRGB::White;
 }
