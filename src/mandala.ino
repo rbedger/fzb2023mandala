@@ -44,7 +44,7 @@ unsigned long lastModePressMillis = 0;
 unsigned long lastLoopMillis = 0;
 
 OnOff prevBtnState = OnOff::OFF;
-Mode curMode = Mode::Chase;
+Mode curMode = Mode::SlowFade;
 
 void setup()
 {
@@ -116,13 +116,14 @@ int currentGreenIndex = NUM_LEDS_RING / 3 * 2;
 
 void displayMode()
 {
+  FastLED.clearData();
+
   switch (curMode)
   {
   case Mode::Boot:
     fill_solid(leds, NUM_LEDS, CRGB::White);
     break;
   case Mode::Chase:
-    FastLED.clearData();
     displayChase(
         CRGB::Red,
         &currentRedIndex);
@@ -178,7 +179,7 @@ void displayChase(
   delay(100);
 }
 
-CRGB slowFadeColors[NUM_LEDS] = {
+CRGB slowFadeColors[] = {
     CRGB::Red,
     CRGB::Violet,
     CRGB::OrangeRed,
@@ -192,31 +193,24 @@ CRGB slowFadeColors[NUM_LEDS] = {
     CRGB::Indigo,
 };
 
+const int numFadeColors = sizeof(slowFadeColors) / sizeof(*slowFadeColors);
+
 void displaySlowFade()
 {
-  const int factor = 1000;
-  const unsigned long iteration = (factor + millis()) / factor;
-
-  Serial.print("Iteration: ");
-  Serial.println(iteration);
+  const long now = millis();
+  const int fadeTimeMs = 2000;
+  const unsigned long currentIteration = (now / fadeTimeMs) % numFadeColors;
 
   for (int i = 0; i < NUM_LEDS; i++)
   {
-    int currentColorIndex = (i + iteration) / NUM_LEDS;
-    CRGB currentColor = slowFadeColors[currentColorIndex];
-    CRGB nextColor = slowFadeColors[(currentColorIndex + 1) % NUM_LEDS];
+    CRGB currentColor = slowFadeColors[currentIteration];
+    CRGB nextColor = slowFadeColors[(currentIteration + 1) % numFadeColors];
 
-    float blendAmount = (iteration % 100) / (float)100;
+    float blendAmount = 100 * (now % fadeTimeMs) / (float)fadeTimeMs;
     CRGB blended = blend(currentColor, nextColor, blendAmount);
-
-    if (i == 0)
-    {
-      Serial.println(currentColorIndex);
-      Serial.println(blendAmount);
-    }
 
     leds[i] = blended;
   }
 
-  delay(1);
+  delay(105);
 }
