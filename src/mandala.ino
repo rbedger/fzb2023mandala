@@ -31,6 +31,7 @@ enum Mode
   Boot = 0,
   Chase = 1,
   SlowFade = 2,
+  Fill = 3,
 };
 
 enum OnOff
@@ -44,7 +45,7 @@ unsigned long lastModePressMillis = 0;
 unsigned long lastLoopMillis = 0;
 
 OnOff prevBtnState = OnOff::OFF;
-Mode curMode = Mode::SlowFade;
+Mode curMode = Mode::Fill;
 
 void setup()
 {
@@ -140,6 +141,9 @@ void displayMode()
   case Mode::SlowFade:
     displaySlowFade();
     break;
+  case Mode::Fill:
+    displayFill();
+    break;
   }
 }
 
@@ -213,4 +217,20 @@ void displaySlowFade()
   }
 
   delay(105);
+}
+
+int fillNum = 1;
+int fillColorIndex = 0;
+
+void displayFill()
+{
+  fill_solid(leds, fillNum++, slowFadeColors[fillColorIndex]);
+
+  if (fillNum >= NUM_LEDS)
+  {
+    fillNum = 0;
+    fillColorIndex = (fillColorIndex + 1) % numFadeColors;
+  }
+
+  delay(200);
 }
