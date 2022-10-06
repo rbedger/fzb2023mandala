@@ -45,7 +45,7 @@ unsigned long lastModePressMillis = 0;
 unsigned long lastLoopMillis = 0;
 
 OnOff prevBtnState = OnOff::OFF;
-Mode curMode = Mode::Fill;
+Mode curMode = Mode::SlowFade;
 
 void setup()
 {
@@ -92,16 +92,16 @@ void readMode()
     {
       const unsigned long now = millis();
       const unsigned long elapsedMillis = now - lastModePressMillis;
-      Serial.print("Elapsed: ");
-      Serial.println(elapsedMillis);
+      // Serial.print("Elapsed: ");
+      // Serial.println(elapsedMillis);
 
       // debounce brightness change a bit
       if (elapsedMillis > 175)
       {
         FastLED.setBrightness((FastLED.getBrightness() + 25) % PROJECT_MAX_BRIGHTNESS);
 
-        Serial.print("Changed brightness to: ");
-        Serial.println(FastLED.getBrightness());
+        // Serial.print("Changed brightness to: ");
+        // Serial.println(FastLED.getBrightness());
 
         lastModePressMillis = now;
       }
@@ -147,37 +147,67 @@ void displayMode()
   }
 }
 
+/// @brief Maps an index to its physical position
+int mapPixel(
+    int index)
+{
+  int retVal = 0;
+
+  // pixels in the ring are offset by one leg
+  if (index < NUM_LEDS_RING)
+  {
+    retVal = index + NUM_LEDS_MANDALA_LEG;
+  }
+  else
+  {
+    int legIndex = 0;
+    int indexAfterRing = index - NUM_LEDS_RING;
+    if (index >= NUM_LEDS_RING + NUM_LEDS_MANDALA_LEG)
+    {
+      legIndex = indexAfterRing / NUM_LEDS_MANDALA_LEG;
+    }
+
+    Serial.printf("Leg Index: %d", legIndex);
+
+    switch (legIndex)
+    {
+    case 0:
+      // the first leg is physically before the ring, but logically after
+      Serial.println("Case 0");
+      retVal = (index + 1) % NUM_LEDS_MANDALA_LEG;
+      break;
+    case 1:
+    {
+      Serial.println("Case 1");
+      // the second leg runs INWARD, across from the first leg
+      // thus, it needs to reverse direction
+      int endOfLeg = NUM_LEDS_RING + NUM_LEDS_MANDALA_LEG * 2 - 1;
+      int offset = endOfLeg - index;
+      retVal = endOfLeg - offset;
+      break;
+    }
+    case 2:
+    case 3:
+      Serial.println("Case 2/3");
+      retVal = NUM_LEDS_RING + (NUM_LEDS_MANDALA_LEG * legIndex) + (indexAfterRing % NUM_LEDS_MANDALA_LEG);
+      break;
+    }
+  }
+
+  Serial.printf("Requested [%d], returned [%d]\n", index, retVal);
+
+  delay(100);
+
+  return retVal;
+}
+
 void displayChase(
     CRGB chaseColor,
     int *currentChaseIndex)
 {
   unsigned char nextChaseIndex = (*currentChaseIndex + 1) % NUM_LEDS;
 
-  if (nextChaseIndex < NUM_LEDS_RING)
-  {
-    leds[nextChaseIndex] = chaseColor;
-  }
-  else if (nextChaseIndex < NUM_LEDS_MANDALA_LEG + NUM_LEDS_RING)
-  {
-    for (int i = 0; i < 4; i++)
-    {
-      int legIndex = nextChaseIndex + (NUM_LEDS_MANDALA_LEG * i);
-      if (i % 2 == 1)
-      {
-        leds[legIndex] = chaseColor;
-      }
-      else
-      {
-        int endOfLeg = NUM_LEDS_RING + NUM_LEDS_MANDALA_LEG - 1 + (NUM_LEDS_MANDALA_LEG * i);
-        int offset = endOfLeg - legIndex;
-        leds[endOfLeg - (NUM_LEDS_MANDALA_LEG - 1 - offset)] = chaseColor;
-      }
-    }
-  }
-  else
-  {
-    nextChaseIndex = 0;
-  }
+  leds[mapPixel(nextChaseIndex)] = chaseColor;
 
   *currentChaseIndex = nextChaseIndex;
   delay(100);
@@ -205,16 +235,13 @@ void displaySlowFade()
   const int fadeTimeMs = 2000;
   const unsigned long currentIteration = (now / fadeTimeMs) % numFadeColors;
 
-  for (int i = 0; i < NUM_LEDS; i++)
-  {
-    CRGB currentColor = slowFadeColors[currentIteration];
-    CRGB nextColor = slowFadeColors[(currentIteration + 1) % numFadeColors];
+  CRGB currentColor = slowFadeColors[currentIteration];
+  CRGB nextColor = slowFadeColors[(currentIteration + 1) % numFadeColors];
 
-    float blendAmount = 100 * (now % fadeTimeMs) / (float)fadeTimeMs;
-    CRGB blended = blend(currentColor, nextColor, blendAmount);
+  float blendAmount = 256 * (now % fadeTimeMs) / (float)fadeTimeMs;
+  CRGB blended = blend(currentColor, nextColor, blendAmount);
 
-    leds[i] = blended;
-  }
+  fill_solid(leds, NUM_LEDS, blended);
 
   delay(105);
 }
@@ -228,7 +255,7 @@ void displayFill()
 
   if (fillNum >= NUM_LEDS)
   {
-    fillNum = 0;
+    fillNum = 1;
     fillColorIndex = (fillColorIndex + 1) % numFadeColors;
   }
 
