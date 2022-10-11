@@ -14,11 +14,15 @@ Used an existing model for a [mandala](https://www.thingiverse.com/thing:4248155
 * [Slip ring](https://www.amazon.com/dp/B07H2SRMXP?psc=1&ref=ppx_yo2ov_dt_b_product_details)
 * [WS2811 LEDs, 60/m](https://www.amazon.com/dp/B01CNL6LBK?psc=1&ref=ppx_yo2ov_dt_b_product_details)
 
-## Pics/Videos
+## Pics
 
-[YouTube playlist](https://youtube.com/playlist?list=PLmc5OZXUN7qBR3jY8X3rpX6R48wXMFphM)
+![3d model](./docs/model.png)</br>
+![Mandala](./docs/mandala.jpg)</br>
+![Base/Electronics](./docs/electonics.jpg)</br>
 
-![3d model](./docs/model.png)
-![Mandala](./docs/mandala.jpg)
-![Base/Electronics](./docs/electonics.jpg)
+## Videos
+
+[![Print Timelapse](./docs/print_timelapse.png)](https://youtu.be/HSAxc5erBlw)</br>
+[![LED Test](./docs/mandala_led_test.png)](https://youtube.com/shorts/qlPCZ4Vacwc)</br>
+[![Bottom Half](./docs/bottom_half.png)](https://youtube.com/shorts/_1KngPnwFcU)</br>
 
