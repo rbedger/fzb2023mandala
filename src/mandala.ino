@@ -8,23 +8,36 @@
 
 #include "FastLED.h"
 
+// the pin that the LEDs are attached to
 #define DATA_PIN D4
 
+// the analog pin that the mode/brightness button is attached to
 #define MODE_PIN A0
+// the minimum voltage reading from A0 before a button press is recognized
 #define ANALOG_THRESHOLD 900
 
+// the number of LEDs in the outer ring
 #define NUM_LEDS_RING 31
+// the number of legs attached to the underside of the mandala
 #define NUM_MANDALA_LEGS 4
+// the number of LEDs per mandala leg
 #define NUM_LEDS_MANDALA_LEG 4
+// the total number of LEDs in the mandala
 #define NUM_LEDS_MANDALA (NUM_MANDALA_LEGS * NUM_LEDS_MANDALA_LEG)
+// the total number of LEDs in the project
 #define NUM_LEDS (NUM_LEDS_RING + NUM_LEDS_MANDALA)
 
 // 60ma/led, 2A max slip ring
 #define PROJECT_MAX_BRIGHTNESS 180
 
+// the number of program loops that must occur before brightness change occurs
 #define MIN_BRIGHTNESS_LOOPS 3
 
+// the LED strip
 CRGB leds[NUM_LEDS];
+
+#define NUM_RANDOM_COLORS 15
+CRGB randomColors[NUM_RANDOM_COLORS];
 
 #define NUM_MODES 5
 enum Mode
@@ -93,10 +106,11 @@ void readMode()
     // i.e. transitioning to OFF from a brightness change should not change mode.
     if (prevBtnState == OnOff::ON && modePressLoopCount <= MIN_BRIGHTNESS_LOOPS)
     {
-      curMode = (Mode)((((int)curMode) + 1) % NUM_MODES);
+      const Mode newMode = (Mode)((((int)curMode) + 1) % NUM_MODES);
 
-      Serial.print("Mode switched to ");
-      Serial.println(curMode);
+      handleModeChange(curMode, newMode);
+
+      curMode = newMode;
     }
 
     modePressLoopCount = 0;
@@ -108,16 +122,13 @@ void readMode()
     {
       const unsigned long now = millis();
       const unsigned long elapsedMillis = now - lastModePressMillis;
-      // Serial.print("Elapsed: ");
-      // Serial.println(elapsedMillis);
 
       // debounce brightness change a bit
       if (elapsedMillis > 175)
       {
         FastLED.setBrightness((FastLED.getBrightness() + 25) % PROJECT_MAX_BRIGHTNESS);
 
-        Serial.print("Changed brightness to: ");
-        Serial.println(FastLED.getBrightness());
+        Serial.printf("Changed brightness to [%d]", FastLED.getBrightness());
 
         lastModePressMillis = now;
       }
@@ -125,6 +136,29 @@ void readMode()
   }
 
   prevBtnState = curBtnState;
+}
+
+void handleModeChange(
+    Mode curMode,
+    Mode newMode)
+{
+  Serial.printf("Changed mode from [%s] to [%s]\n", __STRINGIFY(curMode), __STRINGIFY(newMode));
+
+  switch (newMode)
+  {
+  case Mode::SlowFade:
+  case Mode::Fill:
+    Serial.printf("Generating [%d] random colors\n", NUM_RANDOM_COLORS);
+
+    for (int i = 0; i < NUM_RANDOM_COLORS; i++)
+    {
+      randomColors[i] = CRGB(random8(), random8(), random8());
+    }
+    break;
+  default:
+    Serial.printf("No custom mode setup for [%s]\n", __STRINGIFY(newMode));
+    break;
+  }
 }
 
 int currentRedIndex = 0;
@@ -138,7 +172,6 @@ void displayMode(
 
   switch (curMode)
   {
-  case Mode::Cycle:
   case Mode::Chase:
     displayChase(
         CRGB::Red,
@@ -185,18 +218,14 @@ int mapPixel(
       legIndex = indexAfterRing / NUM_LEDS_MANDALA_LEG;
     }
 
-    // Serial.printf("Leg Index: %d", legIndex);
-
     switch (legIndex)
     {
     case 0:
       // the first leg is physically before the ring, but logically after
-      // Serial.println("Case 0");
       retVal = (index + 1) % NUM_LEDS_MANDALA_LEG;
       break;
     case 1:
     {
-      // Serial.println("Case 1");
       // the second leg runs INWARD, across from the first leg
       // thus, it needs to reverse direction
       int endOfLeg = NUM_LEDS_RING + NUM_LEDS_MANDALA_LEG * 2 - 1;
@@ -206,15 +235,10 @@ int mapPixel(
     }
     case 2:
     case 3:
-      // Serial.println("Case 2/3");
       retVal = NUM_LEDS_RING + (NUM_LEDS_MANDALA_LEG * legIndex) + (indexAfterRing % NUM_LEDS_MANDALA_LEG);
       break;
     }
   }
-
-  // Serial.printf("Requested [%d], returned [%d]\n", index, retVal);
-
-  delay(100);
 
   return retVal;
 }
@@ -231,30 +255,14 @@ void displayChase(
   delay(100);
 }
 
-CRGB slowFadeColors[] = {
-    CRGB::Red,
-    CRGB::Violet,
-    CRGB::OrangeRed,
-    CRGB::Yellow,
-    CRGB::Blue,
-    CRGB::YellowGreen,
-    CRGB::Teal,
-    CRGB::Green,
-    CRGB::Orange,
-    CRGB::BlueViolet,
-    CRGB::Indigo,
-};
-
-const int numFadeColors = sizeof(slowFadeColors) / sizeof(*slowFadeColors);
-
 void displaySlowFade()
 {
   const long now = millis();
   const int fadeTimeMs = 2000;
-  const unsigned long currentIteration = (now / fadeTimeMs) % numFadeColors;
+  const unsigned long currentIteration = (now / fadeTimeMs) % NUM_RANDOM_COLORS;
 
-  CRGB currentColor = slowFadeColors[currentIteration];
-  CRGB nextColor = slowFadeColors[(currentIteration + 1) % numFadeColors];
+  CRGB currentColor = randomColors[currentIteration];
+  CRGB nextColor = randomColors[(currentIteration + 1) % NUM_RANDOM_COLORS];
 
   float blendAmount = 256 * (now % fadeTimeMs) / (float)fadeTimeMs;
   CRGB blended = blend(currentColor, nextColor, blendAmount);
@@ -269,12 +277,12 @@ int fillColorIndex = 0;
 
 void displayFill()
 {
-  fill_solid(leds, fillNum++, slowFadeColors[fillColorIndex]);
+  fill_solid(leds, fillNum++, randomColors[fillColorIndex]);
 
   if (fillNum >= NUM_LEDS)
   {
     fillNum = 1;
-    fillColorIndex = (fillColorIndex + 1) % numFadeColors;
+    fillColorIndex = (fillColorIndex + 1) % NUM_RANDOM_COLORS;
   }
 
   delay(200);
